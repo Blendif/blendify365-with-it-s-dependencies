@@ -65,3 +65,27 @@ app.post('/upload-ebook', (req, res) => {
     .catch((err) => res.status(400).json('Error: ' + err));
 });
 
+const stripe = require('stripe')('your-stripe-secret-key');
+
+app.post('/create-checkout-session', async (req, res) => {
+  const { ebookTitle, ebookPrice } = req.body;
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: [{
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: ebookTitle,
+        },
+        unit_amount: ebookPrice * 100, // Convert to cents
+      },
+      quantity: 1,
+    }],
+    mode: 'payment',
+    success_url: 'http://localhost:3000/success',
+    cancel_url: 'http://localhost:3000/cancel',
+  });
+
+  res.json({ id: session.id });
+});
