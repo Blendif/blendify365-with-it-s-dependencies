@@ -1,24 +1,29 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Set up file storage for Multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
 // MongoDB connection
 mongoose.connect('mongodb://localhost/blendify365', {
   useNewUrlParser: true,
   useUnifiedTopology: true
-});
-
-// Example route for saving an ebook
-app.post('/upload-ebook', (req, res) => {
-  const { title, description, file } = req.body;
-  const newEbook = new Ebook({ title, description, file });
-  newEbook.save()
-    .then(() => res.json('Ebook uploaded successfully'))
-    .catch((err) => res.status(400).json('Error: ' + err));
 });
 
 // Ebook Schema (MongoDB)
@@ -30,8 +35,33 @@ const ebookSchema = new mongoose.Schema({
 
 const Ebook = mongoose.model('Ebook', ebookSchema);
 
+// Upload Ebook route
+app.post('/upload-ebook', upload.single('file'), (req, res) => {
+  const { title, description } = req.body;
+  const file = req.file ? req.file.filename : null;
+
+  const newEbook = new Ebook({ title, description, file });
+  
+  newEbook.save()
+    .then(() => res.json({ message: 'Ebook uploaded successfully' }))
+    .catch((err) => res.status(400).json('Error: ' + err));
+});
+
+// Serve uploaded files statically
+app.use('/uploads', express.static('uploads'));
+
 // Start the server
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+// Example route for saving an ebook
+app.post('/upload-ebook', (req, res) => {
+  const { title, description, file } = req.body;
+  const newEbook = new Ebook({ title, description, file });
+  newEbook.save()
+    .then(() => res.json('Ebook uploaded successfully'))
+    .catch((err) => res.status(400).json('Error: ' + err));
+});
+
