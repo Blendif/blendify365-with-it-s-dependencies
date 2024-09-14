@@ -89,3 +89,80 @@ app.post('/create-checkout-session', async (req, res) => {
 
   res.json({ id: session.id });
 });
+
+// Route to get all ebooks
+app.get('/ebooks', (req, res) => {
+  Ebook.find()
+    .then(ebooks => res.json(ebooks))
+    .catch(err => res.status(400).json('Error: ' + err));
+});
+
+// Route to delete an ebook
+app.delete('/ebooks/:id', (req, res) => {
+  Ebook.findByIdAndDelete(req.params.id)
+    .then(() => res.json({ message: 'Ebook deleted successfully' }))
+    .catch(err => res.status(400).json('Error: ' + err));
+});
+
+const nodemailer = require('nodemailer');
+
+// Set up Nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'your-email@gmail.com',
+    pass: 'your-email-password'
+  }
+});
+
+// After Stripe Payment, Send Download Link
+app.post('/send-email', (req, res) => {
+  const { email, ebookTitle, downloadLink } = req.body;
+
+  const mailOptions = {
+    from: 'your-email@gmail.com',
+    to: email,
+    subject: `Your Purchase: ${ebookTitle}`,
+    text: `Thank you for purchasing ${ebookTitle}. Here is your download link: ${downloadLink}`
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      return res.status(500).json({ message: 'Error sending email' });
+    } else {
+      return res.status(200).json({ message: 'Email sent successfully' });
+    }
+  });
+
+ const { v4: uuidv4 } = require('uuid');
+
+// Route to generate a unique download link
+app.post('/generate-download-link', (req, res) => {
+  const { ebookId, userId } = req.body;
+  const downloadToken = uuidv4();  // Generate unique token
+  const expiryTime = Date.now() + (24 * 60 * 60 * 1000);  // Link valid for 24 hours
+
+  // Save token and expiry in the database (for simplicity, using ebookSchema)
+  Ebook.findByIdAndUpdate(ebookId, {
+    $set: {
+      downloadToken: downloadToken,
+      tokenExpiry: expiryTime
+    }
+  }).then(() => {
+    const downloadLink = `http://localhost:5000/download/${ebookId}/${downloadToken}`;
+    res.json({ downloadLink });
+  }).catch(err => res.status(400).json('Error: ' + err));
+});
+
+// Route to validate and serve download
+app.get('/download/:ebookId/:token', (req, res) => {
+  Ebook.findById(req.params.ebookId)
+    .then(ebook => {
+      if (ebook.downloadToken === req.params.token && ebook.tokenExpiry > Date.now()) {
+        res.sendFile(__dirname + `/uploads/${ebook.file}`);  // Serve the file
+      } else {
+        res.status(403).json({ message: 'Invalid or expired download link' });
+      }
+    })
+    .catch(err => res.status(400).json('Error: ' + err));
+});
