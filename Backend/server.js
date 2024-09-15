@@ -170,5 +170,96 @@ app.get('/download/:ebookId/:token', (req, res) => {
   Ebook.findByIdAndDelete(req.params.id)
     .then(() => res.json('Ebook deleted successfully'))
     .catch(err => res.status(400).json('Error: ' + err));
+    // Import necessary modules
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const nodemailer = require('nodemailer');
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Initialize Express app
+const app = express();
+
+// Middleware
+app.use(cors());  // To handle cross-origin requests
+app.use(express.json());  // To parse JSON bodies
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+  .then(() => console.log('MongoDB connected'))
+  .catch((err) => console.log('MongoDB connection error:', err));
+
+// Stripe Payment Route
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: req.body.items.map(item => ({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: item.name,
+          },
+          unit_amount: item.price * 100,  // Price in cents
+        },
+        quantity: item.quantity,
+      })),
+      mode: 'payment',
+      success_url: `${process.env.CLIENT_URL}/success`,
+      cancel_url: `${process.env.CLIENT_URL}/cancel`,
+    });
+    res.json({ id: session.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Nodemailer Configuration for Email Notifications
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USERNAME,  // Add this to .env
+    pass: process.env.EMAIL_PASSWORD,  // Add this to .env
+  },
+});
+
+// Sending an email after purchase
+app.post('/send-email', (req, res) => {
+  const { email, subject, text } = req.body;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USERNAME,
+    to: email,
+    subject: subject,
+    text: text,
+  };
+
+  transporter.sendMail(mailOptions, (err, info) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: 'Email sent: ' + info.response });
+    }
+  });
+});
+
+// Example Route to Test the Server
+app.get('/', (req, res) => {
+  res.send('Backend is running');
+});
+
+// Set the server to listen on a port
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
 });
 
