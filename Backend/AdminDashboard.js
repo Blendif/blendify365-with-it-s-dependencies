@@ -58,4 +58,19 @@ const EbookUpload = () => {
   );
 };
 
+  const [modalOpen, setModalOpen] = useState(false);
+const [selectedEbook, setSelectedEbook] = useState(null);
+
+const handlePreview = (ebook) => {
+  setSelectedEbook(ebook);
+  setModalOpen(true);
+};
+
+const closeModal = () => {
+  setModalOpen(false);
+};
+
+// In the render section
+<Modal isOpen={modalOpen} content={selectedEbook} closeModal={closeModal} />
+
 export default EbookUpload;
