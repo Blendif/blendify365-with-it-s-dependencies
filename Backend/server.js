@@ -166,3 +166,9 @@ app.get('/download/:ebookId/:token', (req, res) => {
     })
     .catch(err => res.status(400).json('Error: ' + err));
 });
+  app.delete('/ebooks/:id', (req, res) => {
+  Ebook.findByIdAndDelete(req.params.id)
+    .then(() => res.json('Ebook deleted successfully'))
+    .catch(err => res.status(400).json('Error: ' + err));
+});
+
